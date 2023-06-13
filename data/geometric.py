@@ -18,10 +18,8 @@ c = 0
 x = 1 
 
 while x == 1:
-    """
-    HeyVL.invariant: "...." 
-    """
-    Annotate.HeyVL(" .... ")
+    Annotate ("HeyVL.invariant", "....")
+    Annotate("HeyVL", " .... ")
     if bernoulli(0.5).rvs(): 
         x = 0 
     else: 
