@@ -160,7 +160,7 @@ class Translator(ast.NodeVisitor, ABC):
                     )
                 ]
             ):
-                return self.probprog(probprog_name, [arg.arg for arg in probprog_args], probprog_body)
+                self.probprog(probprog_name, [arg.arg for arg in probprog_args], probprog_body)
     
             case _:
                 raise Exception("Encountered FunctionDef that is not probabilistic program.")
@@ -182,10 +182,10 @@ class Translator(ast.NodeVisitor, ABC):
                     ]
                 )
             ):
-                return self.probprog_sample(target, address, distribution_name, distribution_args, distribution_keywords)
+                self.probprog_sample(target, address, distribution_name, distribution_args, distribution_keywords)
 
             case _:
-                return self.visit_Assign(node)
+                self.visit_Assign(node)
 
     
     @abstractmethod
@@ -204,7 +204,7 @@ class Translator(ast.NodeVisitor, ABC):
                         ast.Call(func=ast.Attribute(value=ast.Name(id="pr"), attr=distribution_name), args=distribution_args, keywords=distribution_keywords)
                     ]
             ):
-                return self.probprog_observe(value, address, distribution_name, distribution_args, distribution_keywords)
+                self.probprog_observe(value, address, distribution_name, distribution_args, distribution_keywords)
 
             case ast.Call(
                 func=ast.Attribute(value=ast.Name(id="pr"), attr="observe"),
@@ -213,7 +213,7 @@ class Translator(ast.NodeVisitor, ABC):
                         address
                     ]
             ):
-                return self.probprog_boolean_observe(value, address)
+                self.probprog_boolean_observe(value, address)
 
             
             case ast.Call(
@@ -222,10 +222,10 @@ class Translator(ast.NodeVisitor, ABC):
                         value
                     ]
             ):
-                return self.probprog_factor(value)
+                self.probprog_factor(value)
 
             case _:
-                return self.visit_Call(node)
+                self.visit_Call(node)
 
     
     @abstractmethod
@@ -510,9 +510,6 @@ class PythonTranslator(Translator):
     def visit_Attribute(self, node):
         self.set_precedence(ast._Precedence.ATOM, node.value)
         self.traverse(node.value)
-        # Special case: 3.__abs__() is a syntax error, so if node.value
-        # is an integer literal then we need to either parenthesize
-        # it or add an extra space to get 3 .__abs__().
         if isinstance(node.value, ast.Constant) and isinstance(node.value.value, int):
             self.write(" ")
         self.write(".")
@@ -526,6 +523,18 @@ class PythonTranslator(Translator):
 
 
 class PyroTranslator(PythonTranslator):
+    def visit_Call(self, node):
+        match node:
+            case ast.Call(
+                func=ast.Attribute(value=ast.Name(id="pr"),attr="IndexedAddress"),
+                args = [ast.Constant(value=address), index]
+                ):
+                if isinstance(index, ast.Name):
+                    self.write("f'" + address + "_{" + index.id + "}'")
+                    return
+
+        super().visit_Call(node)
+
     def probprog(self, name: str, args: list[str], body):
         self.write("import pyro\n")
         self.write("import pyro.distributions as dist\n")
@@ -548,7 +557,7 @@ class PyroTranslator(PythonTranslator):
         self.traverse(address)
         self.write(f", dist.{distribution_name}")
         self._write_arguments(distribution_args, distribution_keywords)
-        self.write(", observed = ")
+        self.write(", observed=")
         self.traverse(value)
         self.write(")")
     
