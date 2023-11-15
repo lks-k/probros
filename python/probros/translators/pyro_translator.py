@@ -15,11 +15,26 @@ class PyroTranslator(PythonTranslator):
                         ids.append(str(index.id))
                 pyro_address += ",".join(ids) + "}'"
                 self.write(pyro_address)
-                return
+            
+            case ast.Call(
+                func=ast.Attribute(value=ast.Name(id="pr"),attr="Vector"),
+                args = [size] # TODO: optional type and fill parameter
+                ):
+                with self.delimit("torch.zeros((", ",))"):
+                    self.traverse(size)
+            
+            case ast.Call(
+                func=ast.Attribute(value=ast.Name(id="pr"),attr="Array"),
+                args = [shape] # TODO: optional type and fill parameter
+                ):
+                with self.delimit("torch.zeros(", ")"):
+                    self.traverse(shape)
 
-        super().visit_Call(node)
+            case _:
+                super().visit_Call(node)
 
     def probprog(self, name: str, args: list[str], body):
+        self.write("import torch\n")
         self.write("import pyro\n")
         self.write("import pyro.distributions as dist\n")
         self.write(f"def {name}(", ", ".join(args), ")")

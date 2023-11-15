@@ -238,7 +238,25 @@ class JuliaTranslator(Translator):
             s = f" {operator} "
             self.interleave(lambda: self.write(s), increasing_level_traverse, node.values)
 
+
     def visit_Call(self, node):
+        match node:
+            case ast.Call(
+                func=ast.Attribute(value=ast.Name(id="pr"),attr="Vector"),
+                args = [size] # TODO: optional type and fill parameter
+                ):
+                with self.delimit("zeros(", ")"):
+                    self.traverse(size)
+                return
+            case ast.Call(
+                func=ast.Attribute(value=ast.Name(id="pr"),attr="Array"),
+                args = [shape] # TODO: optional type and fill parameter
+                ):
+                with self.delimit("zeros(", ")"):
+                    self.traverse(shape)
+                return
+
+
         self.set_precedence(ast._Precedence.ATOM, node.func)
         match node.func:
             case ast.Name(id=func_name):

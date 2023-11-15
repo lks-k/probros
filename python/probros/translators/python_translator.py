@@ -258,11 +258,9 @@ class PythonTranslator(Translator):
         self.traverse(node.value)
         with self.delimit("[", "]"):
             if is_non_empty_tuple(node.slice):
-                print("is_non_empty_tuple")
                 # parentheses can be omitted if the tuple isn't empty
                 self.items_view(self.traverse, node.slice.elts)
             else:
-                print("!is_non_empty_tuple")
                 self.traverse(node.slice)
 
     def visit_Attribute(self, node):
