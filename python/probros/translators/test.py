@@ -1,7 +1,7 @@
 
 #%%
-%load_ext autoreload
-%autoreload 2
+#%load_ext autoreload
+#%autoreload 2
 import ast
 from pyro_translator import PyroTranslator
 from turing_translator import TuringTranslator
@@ -17,8 +17,22 @@ def coin_flips(data):
     return p
 """
 a = ast.parse(s).body[0]
-print(ast.dump(a, indent=2))
 
+print(20*"=", "Probros Program:", 20*"=")
+print(s)
+
+print("\n -> Translation to Pyro:\n")
+translator = PyroTranslator()
+print(translator.visit(a))
+
+print("\n -> Translation to Turing:\n")
+translator = TuringTranslator()
+print(translator.visit(a))
+
+
+print("\n -> Translation to Gen:\n")
+translator = GenTranslator()
+print(translator.visit(a))
 #%%
 # this program cannot be translated to Turing.jl
 s = """
@@ -33,7 +47,24 @@ def geometric(p: float):
     return i
 """
 a = ast.parse(s).body[0]
-print(ast.dump(a, indent=2))
+print()
+print(20*"=", "Probros Program:", 20*"=")
+print(s)
+
+print("\n -> Translation to Pyro:\n")
+translator = PyroTranslator()
+print(translator.visit(a))
+
+print("\n -> Translation to Turing:\n")
+try:
+    translator = TuringTranslator()
+    print(translator.visit(a))
+except Exception as e:
+    print(e)
+
+print("\n -> Translation to Gen:\n")
+translator = GenTranslator()
+print(translator.visit(a))
 #%%
 # this program cannot be translated to Turing.jl
 s = """
@@ -51,15 +82,19 @@ def gmm(K, data):
 
 """
 a = ast.parse(s).body[0]
-print(ast.dump(a, indent=2))
+print()
+print(20*"=", "Probros Program:", 20*"=")
+print(s)
 
-# %%
+print("\n -> Translation to Pyro:\n")
 translator = PyroTranslator()
 print(translator.visit(a))
-# %%
+
+print("\n -> Translation to Turing:\n")
 translator = TuringTranslator()
 print(translator.visit(a))
-# %%
+
+
+print("\n -> Translation to Gen:\n")
 translator = GenTranslator()
 print(translator.visit(a))
-# %%
