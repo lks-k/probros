@@ -4,22 +4,21 @@ from contextlib import contextmanager
 import sys
 _INFSTR = "1e" + repr(sys.float_info.max_10_exp + 1)
 
-class JuliaTranslator(Translator):
+class PythonTranslator(Translator):
     def __init__(self):
         super().__init__()
         self._indent = 0
 
     @contextmanager
-    def block(self, write_end=True):
+    def block(self):
         """A context manager for preparing the source for blocks. It adds
         the character':', increases the indentation on enter and decreases
         the indentation on exit.
         """
+        self.write(":")
         self._indent += 1
         yield
         self._indent -= 1
-        if write_end:
-            self.fill("end")
 
     def visit_Expr(self, node):
         self.fill()
@@ -42,38 +41,21 @@ class JuliaTranslator(Translator):
         self.set_precedence(ast._Precedence.TUPLE, node.target)
         self.traverse(node.target)
         self.write(" in ")
-        match node.iter:
-            case ast.Call(
-                    func=ast.Name(id="range"),
-                    args=[end_iter]
-                ):
-                    self.write("0:")
-                    self.traverse(end_iter)
-                    self.write("-1")
-            case ast.Call(
-                    func=ast.Name(id="range"),
-                    args=[start_iter, end_iter]
-                ):
-                    self.traverse(start_iter)
-                    self.write(":")
-                    self.traverse(end_iter)
-                    self.write("-1")
-            case _:
-                raise Exception(f"Unsupported for loop range {ast.dump(node.iter)}")
+        self.traverse(node.iter)
         with self.block():
             self.traverse(node.body)
 
     def visit_If(self, node):
         self.fill("if ")
         self.traverse(node.test)
-        with self.block(write_end=node.orelse is None):
+        with self.block():
             self.traverse(node.body)
         # collapse nested ifs into equivalent elifs.
         while node.orelse and len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
             node = node.orelse[0]
-            self.fill("elseif ")
+            self.fill("elif ")
             self.traverse(node.test)
-            with self.block(write_end = not (node.orelse and len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If))):
+            with self.block():
                 self.traverse(node.body)
         # final else
         if node.orelse:
@@ -100,8 +82,6 @@ class JuliaTranslator(Translator):
                 .replace("inf", _INFSTR)
                 .replace("nan", f"({_INFSTR}-{_INFSTR})")
             )
-        elif isinstance(value, str):
-            self.write('"' + repr(value)[1:-1] + '"')
         else:
             self.write(repr(value))
 
@@ -141,7 +121,7 @@ class JuliaTranslator(Translator):
             self.items_view(self.traverse, node.elts)
 
 
-    unop = {"Invert": "~", "Not": "!", "UAdd": "+", "USub": "-"}
+    unop = {"Invert": "~", "Not": "not", "UAdd": "+", "USub": "-"}
     unop_precedence = {
         "not": ast._Precedence.NOT,
         "~": ast._Precedence.FACTOR,
@@ -165,28 +145,35 @@ class JuliaTranslator(Translator):
         "Add": "+",
         "Sub": "-",
         "Mult": "*",
+        "MatMult": "@",
         "Div": "/",
         "Mod": "%",
+        "LShift": "<<",
+        "RShift": ">>",
         "BitOr": "|",
         "BitXor": "^",
         "BitAnd": "&",
-        "Pow": "^",
+        "FloorDiv": "//",
+        "Pow": "**",
     }
 
-    # TODO: map name not symbol
     binop_precedence = {
         "+": ast._Precedence.ARITH,
         "-": ast._Precedence.ARITH,
         "*": ast._Precedence.TERM,
+        "@": ast._Precedence.TERM,
         "/": ast._Precedence.TERM,
         "%": ast._Precedence.TERM,
+        "<<": ast._Precedence.SHIFT,
+        ">>": ast._Precedence.SHIFT,
         "|": ast._Precedence.BOR,
         "^": ast._Precedence.BXOR,
         "&": ast._Precedence.BAND,
-        "^": ast._Precedence.POWER,
+        "//": ast._Precedence.TERM,
+        "**": ast._Precedence.POWER,
     }
 
-    binop_rassoc = frozenset(("^",))
+    binop_rassoc = frozenset(("**",))
     def visit_BinOp(self, node):
         operator = self.binop[node.op.__class__.__name__]
         operator_precedence = self.binop_precedence[operator]
@@ -211,6 +198,10 @@ class JuliaTranslator(Translator):
         "LtE": "<=",
         "Gt": ">",
         "GtE": ">=",
+        "Is": "is",
+        "IsNot": "is not",
+        "In": "in",
+        "NotIn": "not in",
     }
 
     def visit_Compare(self, node):
@@ -221,8 +212,8 @@ class JuliaTranslator(Translator):
                 self.write(" " + self.cmpops[o.__class__.__name__] + " ")
                 self.traverse(e)
 
-    boolops = {"And": "&&", "Or": "||"}
-    boolop_precedence = {"&&": ast._Precedence.AND, "||": ast._Precedence.OR}
+    boolops = {"And": "and", "Or": "or"}
+    boolop_precedence = {"and": ast._Precedence.AND, "or": ast._Precedence.OR}
 
     def visit_BoolOp(self, node):
         operator = self.boolops[node.op.__class__.__name__]
@@ -240,14 +231,7 @@ class JuliaTranslator(Translator):
 
     def visit_Call(self, node):
         self.set_precedence(ast._Precedence.ATOM, node.func)
-        match node.func:
-            case ast.Name(id=func_name):
-                if func_name == "len":
-                    self.write("length")
-                else:
-                    self.write(func_name)
-            case _:
-                self.traverse(node.func)
+        self.traverse(node.func)
         with self.delimit("(", ")"):
             comma = False
             for e in node.args:
@@ -269,20 +253,14 @@ class JuliaTranslator(Translator):
                 isinstance(slice_value, tuple)
                 and slice_value.elts
             )
-        def traverser(node):
-            self.traverse(node)
-            self.write("+1")
 
         self.set_precedence(ast._Precedence.ATOM, node.value)
         self.traverse(node.value)
         with self.delimit("[", "]"):
             if is_non_empty_tuple(node.slice):
                 # parentheses can be omitted if the tuple isn't empty
-                self.items_view(traverser, node.slice.elts)
-            elif isinstance(node.slice, ast.Name):
-                self.write(node.slice.id, "+1")
+                self.items_view(self.traverse, node.slice.elts)
             else:
-                # TODO
                 self.traverse(node.slice)
 
     def visit_Attribute(self, node):
