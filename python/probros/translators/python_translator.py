@@ -250,7 +250,7 @@ class PythonTranslator(Translator):
     def visit_Subscript(self, node):
         def is_non_empty_tuple(slice_value):
             return (
-                isinstance(slice_value, tuple)
+                isinstance(slice_value, ast.Tuple)
                 and slice_value.elts
             )
 
@@ -258,9 +258,11 @@ class PythonTranslator(Translator):
         self.traverse(node.value)
         with self.delimit("[", "]"):
             if is_non_empty_tuple(node.slice):
+                print("is_non_empty_tuple")
                 # parentheses can be omitted if the tuple isn't empty
                 self.items_view(self.traverse, node.slice.elts)
             else:
+                print("!is_non_empty_tuple")
                 self.traverse(node.slice)
 
     def visit_Attribute(self, node):

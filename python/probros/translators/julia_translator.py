@@ -266,7 +266,7 @@ class JuliaTranslator(Translator):
     def visit_Subscript(self, node):
         def is_non_empty_tuple(slice_value):
             return (
-                isinstance(slice_value, tuple)
+                isinstance(slice_value, ast.Tuple)
                 and slice_value.elts
             )
         def traverser(node):

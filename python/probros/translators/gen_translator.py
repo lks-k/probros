@@ -6,17 +6,19 @@ class GenTranslator(JuliaTranslator):
         match node:
             case ast.Call(
                 func=ast.Attribute(value=ast.Name(id="pr"),attr="IndexedAddress"),
-                args = [ast.Constant(value=address), index]
+                args = [ast.Constant(value=address), *indexes]
                 ):
-                if isinstance(index, ast.Name):
-                    self.write(":" + address + " => " + index.id)
-                    return
+                gen_address = ":" + address
+                for index in indexes:
+                    if isinstance(index, ast.Name):
+                        gen_address += " => " + index.id
+                self.write(gen_address)
+                return
 
         super().visit_Call(node)
 
     def probprog(self, name: str, args: list[str], body):
-        self.write("using Turing\n")
-        self.write("using Distributions\n")
+        self.write("using Gen\n")
         self.write(f"@model function {name}(", ", ".join(args), ")")
         with self.block():
             self.traverse(body)
@@ -27,7 +29,10 @@ class GenTranslator(JuliaTranslator):
         self.traverse(target)
         self.write(" = ")
         with self.delimit("{", "}"):
-            self.traverse(address)
+            if isinstance(address, ast.Constant) and isinstance(address.value, str):
+                self.write(':' + address.value)
+            else:
+                self.traverse(address)
         self.write(" ~ ")
         self.write(f"{distribution_name}")
         self._write_arguments(distribution_args, distribution_keywords)

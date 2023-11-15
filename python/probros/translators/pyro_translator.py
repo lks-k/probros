@@ -6,11 +6,16 @@ class PyroTranslator(PythonTranslator):
         match node:
             case ast.Call(
                 func=ast.Attribute(value=ast.Name(id="pr"),attr="IndexedAddress"),
-                args = [ast.Constant(value=address), index]
+                args = [ast.Constant(value=address), *indexes]
                 ):
-                if isinstance(index, ast.Name):
-                    self.write("f'" + address + "_{" + index.id + "}'")
-                    return
+                pyro_address = "f'" + address + "_{"
+                ids = []
+                for index in indexes:
+                    if isinstance(index, ast.Name):
+                        ids.append(str(index.id))
+                pyro_address += ",".join(ids) + "}'"
+                self.write(pyro_address)
+                return
 
         super().visit_Call(node)
 
