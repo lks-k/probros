@@ -66,7 +66,7 @@ class JuliaTranslator(Translator):
     def visit_If(self, node):
         self.fill("if ")
         self.traverse(node.test)
-        with self.block(write_end=node.orelse is None):
+        with self.block(write_end=node.orelse==[]):
             self.traverse(node.body)
         # collapse nested ifs into equivalent elifs.
         while node.orelse and len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
@@ -100,6 +100,8 @@ class JuliaTranslator(Translator):
                 .replace("inf", _INFSTR)
                 .replace("nan", f"({_INFSTR}-{_INFSTR})")
             )
+        elif isinstance(value, bool):
+            self.write(repr(value).lower())
         elif isinstance(value, str):
             self.write('"' + repr(value)[1:-1] + '"')
         else:
