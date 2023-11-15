@@ -52,10 +52,10 @@ def gmm(K, data):
 """
 a = ast.parse(s).body[0]
 print(ast.dump(a, indent=2))
+
 # %%
 translator = PyroTranslator()
 print(translator.visit(a))
-
 # %%
 translator = TuringTranslator()
 print(translator.visit(a))

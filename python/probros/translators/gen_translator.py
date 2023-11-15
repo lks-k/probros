@@ -19,7 +19,7 @@ class GenTranslator(JuliaTranslator):
 
     def probprog(self, name: str, args: list[str], body):
         self.write("using Gen\n")
-        self.write(f"@model function {name}(", ", ".join(args), ")")
+        self.write(f"@gen function {name}(", ", ".join(args), ")")
         with self.block():
             self.traverse(body)
 

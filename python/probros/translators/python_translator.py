@@ -121,17 +121,15 @@ class PythonTranslator(Translator):
             self.items_view(self.traverse, node.elts)
 
 
-    unop = {"Invert": "~", "Not": "not", "UAdd": "+", "USub": "-"}
-    unop_precedence = {
-        "not": ast._Precedence.NOT,
-        "~": ast._Precedence.FACTOR,
-        "+": ast._Precedence.FACTOR,
-        "-": ast._Precedence.FACTOR,
+    unop = {
+        "Invert": ("~", ast._Precedence.NOT),
+        "Not": ("not", ast._Precedence.FACTOR),
+        "UAdd": ("+", ast._Precedence.FACTOR),
+        "USub": ("-", ast._Precedence.FACTOR)
     }
 
     def visit_UnaryOp(self, node):
-        operator = self.unop[node.op.__class__.__name__]
-        operator_precedence = self.unop_precedence[operator]
+        operator, operator_precedence = self.unop[node.op.__class__.__name__]
         with self.require_parens(operator_precedence, node):
             self.write(operator)
             # factor prefixes (+, -, ~) shouldn't be separated
@@ -142,41 +140,24 @@ class PythonTranslator(Translator):
             self.traverse(node.operand)
 
     binop = {
-        "Add": "+",
-        "Sub": "-",
-        "Mult": "*",
-        "MatMult": "@",
-        "Div": "/",
-        "Mod": "%",
-        "LShift": "<<",
-        "RShift": ">>",
-        "BitOr": "|",
-        "BitXor": "^",
-        "BitAnd": "&",
-        "FloorDiv": "//",
-        "Pow": "**",
-    }
-
-    binop_precedence = {
-        "+": ast._Precedence.ARITH,
-        "-": ast._Precedence.ARITH,
-        "*": ast._Precedence.TERM,
-        "@": ast._Precedence.TERM,
-        "/": ast._Precedence.TERM,
-        "%": ast._Precedence.TERM,
-        "<<": ast._Precedence.SHIFT,
-        ">>": ast._Precedence.SHIFT,
-        "|": ast._Precedence.BOR,
-        "^": ast._Precedence.BXOR,
-        "&": ast._Precedence.BAND,
-        "//": ast._Precedence.TERM,
-        "**": ast._Precedence.POWER,
+        "Add": ("+", ast._Precedence.ARITH),
+        "Sub": ("-", ast._Precedence.ARITH),
+        "Mult": ("*", ast._Precedence.TERM),
+        "MatMult": ("@", ast._Precedence.TERM),
+        "Div": ("/", ast._Precedence.TERM),
+        "Mod": ("%", ast._Precedence.TERM),
+        "LShift": ("<<", ast._Precedence.SHIFT),
+        "RShift": (">>", ast._Precedence.SHIFT),
+        "BitOr": ("|", ast._Precedence.BOR),
+        "BitXor": ("^", ast._Precedence.BXOR),
+        "BitAnd": ("&", ast._Precedence.BAND),
+        "FloorDiv": ("//", ast._Precedence.TERM),
+        "Pow": ("**", ast._Precedence.POWER),
     }
 
     binop_rassoc = frozenset(("**",))
     def visit_BinOp(self, node):
-        operator = self.binop[node.op.__class__.__name__]
-        operator_precedence = self.binop_precedence[operator]
+        operator, operator_precedence = self.binop[node.op.__class__.__name__]
         with self.require_parens(operator_precedence, node):
             if operator in self.binop_rassoc:
                 left_precedence = operator_precedence.next()
@@ -212,12 +193,13 @@ class PythonTranslator(Translator):
                 self.write(" " + self.cmpops[o.__class__.__name__] + " ")
                 self.traverse(e)
 
-    boolops = {"And": "and", "Or": "or"}
-    boolop_precedence = {"and": ast._Precedence.AND, "or": ast._Precedence.OR}
+    boolops = {
+        "And": ("and", ast._Precedence.AND),
+        "Or": ("or", ast._Precedence.OR)
+    }
 
     def visit_BoolOp(self, node):
-        operator = self.boolops[node.op.__class__.__name__]
-        operator_precedence = self.boolop_precedence[operator]
+        operator, operator_precedence = self.boolops[node.op.__class__.__name__]
 
         def increasing_level_traverse(node):
             nonlocal operator_precedence
